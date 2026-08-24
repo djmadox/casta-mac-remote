@@ -1,0 +1,53 @@
+{
+  "name": "casta-mac-remote",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "electron-main.mjs",
+  "description": "Chromecast-inspirerad fjärrkontroll för Mac",
+  "scripts": {
+    "start": "node server.mjs",
+    "app": "electron .",
+    "prepare-adb": "node scripts/prepare-adb.mjs",
+    "dist": "npm run prepare-adb && electron-builder --mac dmg dir"
+  },
+  "build": {
+    "appId": "se.casta.remote",
+    "productName": "Casta",
+    "artifactName": "Casta-${version}-${arch}.${ext}",
+    "asar": true,
+    "files": [
+      "index.html",
+      "styles.css",
+      "app.js",
+      "server.mjs",
+      "electron-main.mjs",
+      "preload.cjs",
+      "package.json",
+      "assets/icon-1024.png"
+    ],
+    "extraResources": [
+      {
+        "from": "platform-tools",
+        "to": "platform-tools"
+      }
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "dir"
+      ],
+      "category": "public.app-category.entertainment",
+      "icon": "assets/icon-1024.png",
+      "identity": null
+    },
+    "dmg": {
+      "title": "Casta ${version}",
+      "backgroundColor": "#0b0e14"
+    }
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3"
+  }
+}

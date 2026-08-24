@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+dist/
+platform-tools/
+assets/Casta.iconset/
+assets/icon-1024.png
+*-preview.png
+preview.png
+npm-debug.log*
