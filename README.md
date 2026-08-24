@@ -1,37 +1,50 @@
 # Casta
 
-En Chromecast-inspirerad fjärrkontroll för Mac. Appen använder en lokal Node-brygga och Android Debug Bridge för att skicka riktiga fjärrkommandon till Chromecast med Google TV/Google TV Streamer.
+A Chromecast-inspired remote control for macOS. Casta uses a local Node bridge and Android Debug Bridge to send real remote commands to Chromecast with Google TV and Google TV Streamer devices.
 
-## Starta
+The interface is available in English and Swedish. Choose your language under **Settings → Language**.
+
+## Features
+
+- Directional pad, Home, Back, volume, power and input controls
+- YouTube and Netflix shortcuts
+- Text input from the Mac keyboard
+- Live media session status from the connected TV
+- Full and compact remote-only window modes
+- Local Wi-Fi connection with no cloud service
+
+## Run locally
 
 ```bash
 npm install
 npm start
 ```
 
-Öppna sedan `http://localhost:4173`.
+Open `http://localhost:4173`. You can also use the arrow keys, Enter, Escape and Space to control the remote.
 
-Knapparna kan även styras med piltangenterna, Enter, Escape och mellanslag.
+## Connect your TV
 
-## Anslut TV:n
+1. Connect your Mac and Google TV to the same Wi-Fi network.
+2. Enable developer mode by pressing **Android TV OS build** seven times under **Settings → System → About**.
+3. Enable **Wireless debugging** under Developer options.
+4. Select **Add device** in Casta and follow the pairing guide.
 
-1. Se till att Mac och Google TV är på samma Wi‑Fi.
-2. Aktivera utvecklarläge på TV:n genom att trycka sju gånger på Android TV OS-version under **Inställningar → System → Om**.
-3. Aktivera **Trådlös felsökning** under Utvecklaralternativ.
-4. Klicka **Lägg till enhet** i Casta och följ parningsguiden.
+ADB is included in packaged builds. During development, Casta automatically finds Android SDK Platform Tools installed by Android Studio. You can also set a custom path with `CASTA_ADB_PATH`.
 
-ADB finns normalt i Android SDK Platform Tools. Appen hittar installationen från Android Studio automatiskt. Du kan också ange sökvägen med miljövariabeln `CASTA_ADB_PATH`.
+All traffic stays between the Mac and TV on the local network.
 
-All trafik går direkt mellan Macen och TV:n på det lokala nätverket. Ingen molntjänst används.
-
-## Bygg Mac-appen
+## Build the Mac app
 
 ```bash
 npm run dist
 ```
 
-Byggsteget hittar ADB från Android Studio automatiskt och skapar `Casta.app` samt en DMG i `dist/`.
+The build script finds ADB from Android Studio and creates `Casta.app` and a DMG installer in `dist/`.
 
-## Visningslägen
+## View modes
 
-Under **Inställningar** kan du växla mellan hela appfönstret och **Endast fjärrkontroll**. Mac-appen krymper då till ett litet fjärrfönster och kommer ihåg valet till nästa start. Kugghjulet längst upp till höger öppnar inställningarna i kompakt läge.
+Open **Settings** to switch between the complete application window and **Remote only**. Compact mode shrinks Casta to a small remote window and remembers the selection for the next launch. Use the gear button in the upper-right corner to reopen settings.
+
+## Distribution
+
+Local builds are unsigned. Public distribution outside the Mac App Store requires an Apple Developer certificate and notarization.
