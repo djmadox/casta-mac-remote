@@ -88,8 +88,8 @@
               </div>
 
               <div class="app-row">
-                <button class="app-button youtube" data-command="youtube" data-action="Öppnar YouTube" aria-label="YouTube"><span>▶</span></button>
-                <button class="app-button netflix" data-command="netflix" data-action="Öppnar Netflix" aria-label="Netflix">N</button>
+                <button class="app-button youtube" data-command="youtube" data-action="Öppnar YouTube" aria-label="YouTube">YouTube</button>
+                <button class="app-button netflix" data-command="netflix" data-action="Öppnar Netflix" aria-label="Netflix">NETFLIX</button>
               </div>
 
               <div class="remote-row bottom-row">
@@ -131,23 +131,38 @@
           <button class="close-button" id="closeConnection" aria-label="Close" data-i18n-aria="aria.close">×</button>
         </div>
         <div class="setup-guide">
-          <span>1</span><p data-i18n-html="connect.step1">On your TV, open <strong>Settings → System → About</strong> and press <strong>Android TV OS build</strong> seven times.</p>
-          <span>2</span><p data-i18n-html="connect.step2">Open <strong>Developer options → Wireless debugging</strong> and enable it.</p>
-          <span>3</span><p data-i18n-html="connect.step3">Choose <strong>Pair device with pairing code</strong>, then enter the addresses and six-digit code below.</p>
+          <span>1</span><p data-i18n-html="connect.step1">Make sure your Mac and TV are connected to the <strong>same Wi‑Fi</strong>.</p>
+          <span>2</span><p data-i18n-html="connect.step2">Choose <strong>Find TV</strong> and select your Google TV.</p>
+          <span>3</span><p data-i18n-html="connect.step3">Casta asks the TV to show a code. Enter it once, then Casta reconnects automatically.</p>
         </div>
         <div class="discover-row">
-          <button class="secondary-button" id="discoverButton" data-i18n="connect.discover">Search automatically</button>
+          <button class="secondary-button" id="discoverButton" data-i18n="connect.discover">Find TV</button>
           <span id="discoverStatus" data-i18n="connect.sameWifi">Your Mac and TV must be on the same Wi‑Fi.</span>
         </div>
+        <div class="discovered-devices" id="discoveredDevices"></div>
         <form id="connectionForm">
           <label class="host-field"><span data-i18n="connect.ip">TV IP address</span><input id="deviceHost" inputmode="decimal" placeholder="192.168.1.42" required /></label>
-          <label><span data-i18n="connect.pairPort">Pairing port</span><input id="pairPort" inputmode="numeric" placeholder="37123" /></label>
-          <label><span data-i18n="connect.pairCode">Pairing code</span><input id="pairCode" inputmode="numeric" maxlength="6" placeholder="123456" /></label>
-          <label><span data-i18n="connect.connectPort">Connection port · optional</span><input id="connectPort" inputmode="numeric" placeholder="Found automatically" data-i18n-placeholder="connect.auto" /></label>
-          <p class="form-hint" data-i18n="connect.portHint">The pairing and connection ports are different. Casta normally finds the connection port automatically after pairing.</p>
+          <label class="name-field"><span data-i18n="connect.name">TV name</span><input id="deviceName" placeholder="Google TV" /></label>
+          <label class="code-field" id="codeStep" hidden><span data-i18n="connect.pairCode">Code shown on TV</span><input id="pairCode" inputmode="text" maxlength="6" autocomplete="one-time-code" placeholder="ABC123" /></label>
+          <p class="form-hint" id="standardHint" data-i18n="connect.standardHint">No developer mode or Google sign-in is needed.</p>
           <div class="form-error" id="connectionError" role="alert"></div>
-          <button class="send-button" id="connectButton" type="submit" data-i18n="connect.submit">Pair and connect</button>
+          <button class="send-button" id="connectButton" type="submit" data-i18n="connect.showCode">Show code on TV</button>
         </form>
+        <details class="advanced-connection">
+          <summary><span><strong data-i18n="connect.advanced">Advanced connection</strong><small data-i18n="connect.advancedDescription">Optional ADB tools for deeper media information</small></span><svg><use href="#i-chevron" /></svg></summary>
+          <div class="discover-row advanced-discover-row">
+            <button class="secondary-button" id="advancedDiscoverButton" data-i18n="connect.advancedDiscover">Find ADB address</button>
+            <span id="advancedDiscoverStatus" data-i18n="connect.debugRequired">Wireless debugging must be enabled.</span>
+          </div>
+          <form id="adbConnectionForm">
+            <label class="host-field"><span data-i18n="connect.ip">TV IP address</span><input id="adbHost" inputmode="decimal" placeholder="192.168.1.42" required /></label>
+            <label><span data-i18n="connect.pairPort">Pairing port</span><input id="adbPairPort" inputmode="numeric" placeholder="37123" /></label>
+            <label><span data-i18n="connect.pairCode">Pairing code</span><input id="adbPairCode" inputmode="numeric" maxlength="6" placeholder="123456" /></label>
+            <label><span data-i18n="connect.connectPort">Connection port</span><input id="adbConnectPort" inputmode="numeric" placeholder="Found automatically" data-i18n-placeholder="connect.auto" /></label>
+            <div class="form-error" id="adbConnectionError" role="alert"></div>
+            <button class="send-button" id="adbConnectButton" type="submit" data-i18n="connect.advancedSubmit">Connect with ADB</button>
+          </form>
+        </details>
       </div>
     </div>
     <div class="modal-backdrop" id="settingsModal" hidden>

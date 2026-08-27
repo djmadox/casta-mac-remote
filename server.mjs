@@ -6,6 +6,16 @@ import { extname, join, normalize } from 'node:path';
 import { homedir, userInfo } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import {
+  discoverGoogleTVs,
+  finishRemotePairing,
+  hasRemoteDevice,
+  listRemoteDevices,
+  remoteMedia,
+  sendRemoteCommand,
+  sendRemoteText,
+  startRemotePairing
+} from './remote-service.mjs';
 
 const exec = promisify(execFile);
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -82,8 +92,8 @@ async function devices() {
   return output.split('\n').slice(1).map((line) => line.trim()).filter(Boolean).map((line) => {
     const [id, state, ...details] = line.split(/\s+/);
     const model = details.find((part) => part.startsWith('model:'))?.slice(6).replaceAll('_', ' ') || 'Google TV';
-    return { id, state, name: model, connected: state === 'device' };
-  }).filter((device) => !device.id.startsWith('*'));
+    return { id: `adb:${id}`, adbTarget: id, mode: 'advanced', state, name: model, connected: state === 'device' };
+  }).filter((device) => !device.adbTarget.startsWith('*'));
 }
 
 async function userProfile() {
@@ -149,24 +159,42 @@ function parseMediaSession(output) {
 async function api(req, res, pathname) {
   if (req.method === 'GET' && pathname === '/api/status') {
     try {
-      const [connectedDevices, profile] = await Promise.all([devices(), userProfile()]);
-      return json(res, 200, { adbAvailable: Boolean(adb), adbPath: adb, devices: connectedDevices, profile });
+      const [remoteDevices, advancedDevices, profile] = await Promise.all([listRemoteDevices(), devices(), userProfile()]);
+      return json(res, 200, { adbAvailable: Boolean(adb), devices: [...remoteDevices, ...advancedDevices], profile });
     }
     catch (error) { return json(res, 503, { adbAvailable: Boolean(adb), devices: [], error: error.message }); }
   }
   if (req.method === 'GET' && pathname === '/api/discover') {
+    try { return json(res, 200, { devices: await discoverGoogleTVs() }); }
+    catch (error) { return json(res, 500, { error: error.message }); }
+  }
+  if (req.method === 'GET' && pathname === '/api/advanced/discover') {
     try { return json(res, 200, { services: parseMdns(await runAdb(['mdns', 'services'])) }); }
     catch (error) { return json(res, 500, { error: error.message }); }
   }
   if (req.method === 'GET' && pathname === '/api/media') {
     try {
       const device = new URL(req.url, 'http://localhost').searchParams.get('device');
-      if (!validDevice(device)) throw new Error('Ingen giltig enhet är vald.');
-      const output = await runAdb(['-s', device, 'shell', 'dumpsys', 'media_session']);
+      if (hasRemoteDevice(device)) return json(res, 200, { media: remoteMedia(device) });
+      const adbTarget = typeof device === 'string' && device.startsWith('adb:') ? device.slice(4) : '';
+      if (!validDevice(adbTarget)) throw new Error('Ingen giltig enhet är vald.');
+      const output = await runAdb(['-s', adbTarget, 'shell', 'dumpsys', 'media_session']);
       return json(res, 200, { media: parseMediaSession(output) });
     } catch (error) { return json(res, 400, { error: error.message }); }
   }
-  if (req.method === 'POST' && pathname === '/api/pair') {
+  if (req.method === 'POST' && pathname === '/api/remote/pair/start') {
+    try {
+      const data = await bodyJson(req);
+      return json(res, 200, await startRemotePairing(data.host, data.name));
+    } catch (error) { return json(res, 400, { error: error.message }); }
+  }
+  if (req.method === 'POST' && pathname === '/api/remote/pair/finish') {
+    try {
+      const data = await bodyJson(req);
+      return json(res, 200, { ok: true, device: await finishRemotePairing(data.host, data.code) });
+    } catch (error) { return json(res, 400, { error: error.message }); }
+  }
+  if (req.method === 'POST' && pathname === '/api/advanced/pair') {
     try {
       const data = await bodyJson(req);
       if (!validHost(data.host) || !validPort(data.port) || !/^\d{6}$/.test(String(data.code))) throw new Error('Kontrollera IP-adress, parningsport och sexsiffrig kod.');
@@ -175,18 +203,18 @@ async function api(req, res, pathname) {
       await new Promise((resolve) => setTimeout(resolve, 900));
       const services = parseMdns(await runAdb(['mdns', 'services']));
       const connectService = services.find((service) => service.service === 'connect' && service.host === data.host);
-      const connected = (await devices()).find((device) => device.connected && (!connectService || device.id.startsWith(connectService.name)));
+      const connected = (await devices()).find((device) => device.connected && (!connectService || device.adbTarget.startsWith(connectService.name)));
       return json(res, 200, { ok: true, message: output, device: connected || null, connectService: connectService || null });
     } catch (error) { return json(res, 400, { error: error.message }); }
   }
-  if (req.method === 'POST' && pathname === '/api/connect') {
+  if (req.method === 'POST' && pathname === '/api/advanced/connect') {
     try {
       const data = await bodyJson(req);
       if (!validHost(data.host) || !validPort(data.port)) throw new Error('Kontrollera IP-adress och anslutningsport.');
       const id = `${data.host}:${data.port}`;
       const output = await runAdb(['connect', id], 15000);
       if (!/connected to|already connected/i.test(output)) throw new Error(output || 'Anslutningen misslyckades.');
-      const found = (await devices()).find((device) => device.id === id && device.connected);
+      const found = (await devices()).find((device) => device.adbTarget === id && device.connected);
       if (!found) throw new Error('TV:n svarade men blev inte tillgänglig. Försök igen.');
       return json(res, 200, { ok: true, device: found });
     } catch (error) { return json(res, 400, { error: error.message }); }
@@ -194,21 +222,29 @@ async function api(req, res, pathname) {
   if (req.method === 'POST' && pathname === '/api/command') {
     try {
       const data = await bodyJson(req);
-      if (!validDevice(data.device)) throw new Error('Ingen giltig enhet är vald.');
-      if (keyCodes[data.command]) await runAdb(['-s', data.device, 'shell', 'input', 'keyevent', String(keyCodes[data.command])]);
-      else if (appPackages[data.command]) await runAdb(['-s', data.device, 'shell', 'monkey', '-p', appPackages[data.command], '-c', 'android.intent.category.LAUNCHER', '1']);
-      else throw new Error('Okänt fjärrkommando.');
+      if (hasRemoteDevice(data.device)) sendRemoteCommand(data.device, data.command);
+      else {
+        const adbTarget = typeof data.device === 'string' && data.device.startsWith('adb:') ? data.device.slice(4) : '';
+        if (!validDevice(adbTarget)) throw new Error('Ingen giltig enhet är vald.');
+        if (keyCodes[data.command]) await runAdb(['-s', adbTarget, 'shell', 'input', 'keyevent', String(keyCodes[data.command])]);
+        else if (appPackages[data.command]) await runAdb(['-s', adbTarget, 'shell', 'monkey', '-p', appPackages[data.command], '-c', 'android.intent.category.LAUNCHER', '1']);
+        else throw new Error('Okänt fjärrkommando.');
+      }
       return json(res, 200, { ok: true });
     } catch (error) { return json(res, 400, { error: error.message }); }
   }
   if (req.method === 'POST' && pathname === '/api/text') {
     try {
       const data = await bodyJson(req);
-      if (!validDevice(data.device)) throw new Error('Ingen giltig enhet är vald.');
       if (typeof data.text !== 'string' || !data.text.trim() || data.text.length > 200) throw new Error('Texten måste vara 1–200 tecken.');
-      const safeText = data.text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 .,_-]/g, '').replaceAll(' ', '%s');
-      if (!safeText) throw new Error('Texten innehåller inga tecken som kan skickas.');
-      await runAdb(['-s', data.device, 'shell', 'input', 'text', safeText]);
+      if (hasRemoteDevice(data.device)) sendRemoteText(data.device, data.text);
+      else {
+        const adbTarget = typeof data.device === 'string' && data.device.startsWith('adb:') ? data.device.slice(4) : '';
+        if (!validDevice(adbTarget)) throw new Error('Ingen giltig enhet är vald.');
+        const safeText = data.text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 .,_-]/g, '').replaceAll(' ', '%s');
+        if (!safeText) throw new Error('Texten innehåller inga tecken som kan skickas.');
+        await runAdb(['-s', adbTarget, 'shell', 'input', 'text', safeText]);
+      }
       return json(res, 200, { ok: true });
     } catch (error) { return json(res, 400, { error: error.message }); }
   }

@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, safeStorage } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { startServer, server } from './server.mjs';
+import { configureRemoteRuntime, stopRemoteConnections } from './remote-service.mjs';
 
 let mainWindow;
 let localPort;
@@ -61,6 +62,15 @@ app.on('second-instance', () => {
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
+  configureRemoteRuntime({
+    dataDirectory: app.getPath('userData'),
+    protect: (value) => safeStorage.isEncryptionAvailable()
+      ? `keychain:${safeStorage.encryptString(value).toString('base64')}`
+      : `plain:${Buffer.from(value, 'utf8').toString('base64')}`,
+    unprotect: (value) => value.startsWith('keychain:')
+      ? safeStorage.decryptString(Buffer.from(value.slice(9), 'base64'))
+      : Buffer.from(value.replace(/^plain:/, ''), 'base64').toString('utf8')
+  });
   const localServer = await startServer(41730);
   localPort = localServer.address().port;
   createWindow();
@@ -72,5 +82,6 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  stopRemoteConnections();
   if (server.listening) server.close();
 });

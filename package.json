@@ -1,10 +1,10 @@
 {
   "name": "casta-mac-remote",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "main": "electron-main.mjs",
-  "description": "Chromecast-inspirerad fjärrkontroll för Mac",
+  "description": "A Google TV remote for Mac",
   "scripts": {
     "start": "node server.mjs",
     "app": "electron .",
@@ -21,6 +21,7 @@
       "styles.css",
       "app.js",
       "server.mjs",
+      "remote-service.mjs",
       "electron-main.mjs",
       "preload.cjs",
       "package.json",
@@ -49,5 +50,11 @@
   "devDependencies": {
     "electron": "^43.4.1",
     "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "@kud/androidtv-remote": "^0.1.2"
+  },
+  "overrides": {
+    "protobufjs": "7.6.5"
   }
 }
